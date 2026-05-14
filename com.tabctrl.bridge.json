@@ -1,0 +1,9 @@
+{
+  "name": "com.tabctrl.bridge",
+  "description": "TabCtrl native messaging bridge",
+  "path": "__TABCTRL_NATIVE_HOST_PATH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__TABCTRL_EXTENSION_ID__/"
+  ]
+}

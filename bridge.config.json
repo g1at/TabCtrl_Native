@@ -1,0 +1,32 @@
+{
+  "$schema": "./bridge.config.schema.json",
+  "commands": {
+    "feishu": {
+      "win32": [
+        "%APPDATA%\\npm\\feishu.cmd",
+        "%APPDATA%\\npm\\feishu",
+        "feishu.cmd",
+        "feishu",
+        "lark-cli.cmd",
+        "lark-cli"
+      ],
+      "darwin": [
+        "/opt/homebrew/bin/feishu",
+        "/usr/local/bin/feishu",
+        "$HOME/.local/bin/feishu",
+        "feishu",
+        "lark-cli"
+      ],
+      "linux": [
+        "$HOME/.local/bin/feishu",
+        "/usr/local/bin/feishu",
+        "/usr/bin/feishu",
+        "feishu",
+        "lark-cli"
+      ]
+    }
+  },
+  "maxTimeoutMs": 120000,
+  "maxOutputBytes": 1048576,
+  "allowCwd": false
+}

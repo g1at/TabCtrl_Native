@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tabctrl.local/schemas/bridge.config.schema.json",
+  "title": "TabCtrl Native Bridge Config",
+  "description": "Allowlist and safety limits for TabCtrl's optional native messaging bridge.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional editor hint pointing to this schema."
+    },
+    "commands": {
+      "type": "object",
+      "description": "Map logical command names used by TabCtrl to executable candidates.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9._-]+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/commandEntry"
+      },
+      "default": {}
+    },
+    "allowedCommands": {
+      "$ref": "#/$defs/candidateList",
+      "description": "Legacy format. Prefer commands instead."
+    },
+    "maxTimeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 120000,
+      "default": 120000,
+      "description": "Maximum native command runtime. The extension caps this at 120000 ms."
+    },
+    "maxOutputBytes": {
+      "type": "integer",
+      "minimum": 4096,
+      "maximum": 10485760,
+      "default": 1048576,
+      "description": "Maximum stdout/stderr bytes retained from a native command."
+    },
+    "allowCwd": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow model-provided working directories. Keep false unless a dedicated CLI truly needs it."
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Executable name or path. Environment variables such as %APPDATA%, $HOME, ${HOME}, and ~ are expanded by the host."
+    },
+    "candidateList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      },
+      "uniqueItems": true
+    },
+    "commandEntry": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/candidateList",
+          "description": "Legacy command entry: candidates used on every platform."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Platform-aware command entry. Avoid shells or interpreters such as cmd, powershell, bash, python, and node; keep high-capability tools such as git, curl, docker, kubectl, and package managers on manual approval.",
+          "properties": {
+            "win32": { "$ref": "#/$defs/candidateList" },
+            "windows": { "$ref": "#/$defs/candidateList" },
+            "darwin": { "$ref": "#/$defs/candidateList" },
+            "macos": { "$ref": "#/$defs/candidateList" },
+            "linux": { "$ref": "#/$defs/candidateList" },
+            "unix": { "$ref": "#/$defs/candidateList" },
+            "candidates": { "$ref": "#/$defs/candidateList" },
+            "default": { "$ref": "#/$defs/candidateList" }
+          },
+          "anyOf": [
+            { "required": ["win32"] },
+            { "required": ["windows"] },
+            { "required": ["darwin"] },
+            { "required": ["macos"] },
+            { "required": ["linux"] },
+            { "required": ["unix"] },
+            { "required": ["candidates"] },
+            { "required": ["default"] }
+          ]
+        }
+      ]
+    }
+  }
+}
