@@ -1,0 +1,17 @@
+{
+  "$schema": "../bridge.config.schema.json",
+  "commands": {
+    "feishu": {
+      "darwin": [
+        "/opt/homebrew/bin/feishu",
+        "/usr/local/bin/feishu",
+        "$HOME/.local/bin/feishu",
+        "feishu",
+        "lark-cli"
+      ]
+    }
+  },
+  "maxTimeoutMs": 120000,
+  "maxOutputBytes": 1048576,
+  "allowCwd": false
+}

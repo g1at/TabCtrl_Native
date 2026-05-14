@@ -9,14 +9,20 @@ TabCtrl still prefers browser tools for reading pages, clicking, typing, and
 short edits. The native bridge is intended for structured APIs, batch work, long
 document writes, and file upload workflows such as Feishu/Lark. `run` calls are
 approved by the extension unless explicitly auto-approved, and the native host
-always enforces its own command allowlist from `bridge.config.json`.
+always enforces its own platform command allowlist from `config/<platform>/bridge.config.json`.
 
 ## Files
 
 ```text
 native/
-|-- bridge.config.json              # Local command allowlist
-|-- bridge.config.schema.json       # JSON schema for the allowlist
+|-- config/
+|   |-- bridge.config.schema.json    # JSON schema for platform configs
+|   |-- windows/bridge.config.json
+|   |-- macos/bridge.config.json
+|   `-- linux/bridge.config.json
+|-- docs/
+|   |-- README.en.md
+|   `-- README.zh-CN.md
 |-- com.tabctrl.bridge.json         # Manifest template
 |-- com.tabctrl.bridge.installed.json
 |-- generate-manifest.cjs           # Chrome/Edge manifest generator
@@ -145,12 +151,22 @@ check that `node` is available.
 
 ## Command Allowlist
 
-Edit `native/bridge.config.json` to control which logical commands the host can
-run. The default configuration exposes Feishu/Lark CLI candidates:
+Edit the platform config for your operating system to control which logical
+commands the host can run:
+
+- Windows: `native/config/windows/bridge.config.json`
+- macOS: `native/config/macos/bridge.config.json`
+- Linux: `native/config/linux/bridge.config.json`
+
+The host selects the current platform config automatically. For compatibility,
+it also falls back to `native/config/bridge.config.json` and then the old
+root-level `native/bridge.config.json` if the new platform file is missing.
+
+The default Windows config exposes Feishu/Lark CLI candidates:
 
 ```json
 {
-  "$schema": "./bridge.config.schema.json",
+  "$schema": "../bridge.config.schema.json",
   "commands": {
     "feishu": {
       "win32": [
@@ -159,20 +175,6 @@ run. The default configuration exposes Feishu/Lark CLI candidates:
         "feishu.cmd",
         "feishu",
         "lark-cli.cmd",
-        "lark-cli"
-      ],
-      "darwin": [
-        "/opt/homebrew/bin/feishu",
-        "/usr/local/bin/feishu",
-        "$HOME/.local/bin/feishu",
-        "feishu",
-        "lark-cli"
-      ],
-      "linux": [
-        "$HOME/.local/bin/feishu",
-        "/usr/local/bin/feishu",
-        "/usr/bin/feishu",
-        "feishu",
         "lark-cli"
       ]
     }
@@ -183,14 +185,15 @@ run. The default configuration exposes Feishu/Lark CLI candidates:
 }
 ```
 
-The keys under `commands` are logical command names used by TabCtrl. The values
-can be a legacy candidate array or a platform-aware object. The host expands
-`%APPDATA%`, `$HOME`, `${HOME}`, and `~`, then resolves candidates itself. It
-does not call `which`, `where`, or a shell to resolve commands.
+The keys under `commands` are logical command names used by TabCtrl. Each
+platform file may contain only the candidates relevant to that OS, but the host
+still supports the legacy combined format. It expands `%APPDATA%`, `$HOME`,
+`${HOME}`, and `~`, then resolves candidates itself. It does not call `which`,
+`where`, or a shell to resolve commands.
 
-`bridge.config.schema.json` provides editor hints and basic validation. The host
-itself remains the source of truth for command allowlisting, risk diagnostics,
-and path resolution.
+`config/bridge.config.schema.json` provides editor hints and basic validation.
+The host itself remains the source of truth for command allowlisting, risk
+diagnostics, and path resolution.
 
 ## Custom Commands
 
@@ -247,10 +250,10 @@ Avoid:
   `sh`, `python`, `node`, `ruby`, and `perl`. Allowlisting them effectively
   turns the bridge into arbitrary code execution.
 
-`bridge.config.json` controls what local programs can run. Settings > Lab >
-auto-approved commands only controls whether TabCtrl skips the confirmation
-prompt for a logical command. Keep new commands on manual approval until their
-call pattern is predictable.
+The selected platform config controls what local programs can run. Settings >
+Lab > auto-approved commands only controls whether TabCtrl skips the
+confirmation prompt for a logical command. Keep new commands on manual approval
+until their call pattern is predictable.
 
 ## Windows `.cmd` and `.bat` Compatibility
 
@@ -291,8 +294,8 @@ Resolves an allowlisted logical command to the concrete executable path.
 
 ### `diagnose`
 
-Reads `native/bridge.config.json`, resolves candidates for the current platform,
-and reports risky configuration choices such as shells, interpreters,
+Reads the selected platform config, resolves candidates for the current
+platform, and reports risky configuration choices such as shells, interpreters,
 high-capability tools, missing commands, or `allowCwd`. It does not execute local
 commands.
 
@@ -336,7 +339,7 @@ can exceed Chrome's native messaging response limit.
 ## Using the Bridge in TabCtrl
 
 1. Install the native host for your browser and platform.
-2. Make sure `bridge.config.json` points to installed CLI candidates.
+2. Make sure your platform config points to installed CLI candidates.
 3. Enable Settings > Lab in TabCtrl.
 4. Run "Check bridge" to verify native messaging connectivity.
 5. Run "Check config" to inspect resolved paths and risk diagnostics.
@@ -350,7 +353,7 @@ blocked by approval rules or by the native host allowlist.
 
 - If `ping` fails, reinstall the native manifest for the correct browser and
   extension id, then reload the extension.
-- If `which` fails, check `bridge.config.json`, PATH, and whether the CLI is
+- If `which` fails, check your platform config, PATH, and whether the CLI is
   installed for the same OS user that runs the browser.
 - If `run` fails with `.cmd` argument safety errors on Windows, move complex
   content into `native_bridge.input` or use a non-`.cmd` executable.

@@ -7,7 +7,30 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const ROOT = __dirname;
-const CONFIG_PATH = path.join(ROOT, "bridge.config.json");
+const CONFIG_DIR = path.join(ROOT, "config");
+const LEGACY_CONFIG_PATH = path.join(ROOT, "bridge.config.json");
+
+function configFolderForPlatform(platform = process.platform) {
+  if (platform === "win32") return "windows";
+  if (platform === "darwin") return "macos";
+  if (platform === "linux") return "linux";
+  return platform;
+}
+
+function defaultConfigPath(platform = process.platform) {
+  return path.join(CONFIG_DIR, configFolderForPlatform(platform), "bridge.config.json");
+}
+
+function configPathCandidates(options = {}) {
+  const env = options.env || process.env;
+  const explicit = options.configPath || env.TABCTRL_NATIVE_CONFIG;
+  if (explicit) return [path.resolve(String(explicit))];
+  return [
+    defaultConfigPath(options.platform || process.platform),
+    path.join(CONFIG_DIR, "bridge.config.json"),
+    LEGACY_CONFIG_PATH,
+  ];
+}
 
 function defaultConfig() {
   return {
@@ -55,26 +78,34 @@ function mergeConfig(defaults, raw) {
   };
 }
 
-function loadConfigWithMeta(configPath = CONFIG_PATH) {
+function loadConfigWithMeta(options = {}) {
+  if (typeof options === "string") options = { configPath: options };
   const defaults = defaultConfig();
-  try {
-    const source = fs.readFileSync(configPath, "utf8");
-    const raw = JSON.parse(source);
-    return {
-      config: mergeConfig(defaults, raw),
-      configPath,
-      loaded: true,
-      usedDefaults: false,
-    };
-  } catch (error) {
-    return {
-      config: defaults,
-      configPath,
-      loaded: false,
-      usedDefaults: true,
-      error: String(error.message || error),
-    };
+  const candidates = configPathCandidates(options);
+  let lastError = "";
+  for (const configPath of candidates) {
+    try {
+      const source = fs.readFileSync(configPath, "utf8");
+      const raw = JSON.parse(source);
+      return {
+        config: mergeConfig(defaults, raw),
+        configPath,
+        configCandidates: candidates,
+        loaded: true,
+        usedDefaults: false,
+      };
+    } catch (error) {
+      lastError = `${configPath}: ${String(error.message || error)}`;
+    }
   }
+  return {
+    config: defaults,
+    configPath: candidates[0],
+    configCandidates: candidates,
+    loaded: false,
+    usedDefaults: true,
+    error: lastError,
+  };
 }
 
 function loadConfig() {
@@ -158,10 +189,11 @@ async function handleMessage(message) {
 }
 
 function diagnoseConfig(options = {}) {
-  const meta = loadConfigWithMeta(options.configPath || CONFIG_PATH);
+  const meta = loadConfigWithMeta(options);
   return validateConfig(meta.config, {
     ...options,
     configPath: meta.configPath,
+    configCandidates: meta.configCandidates,
     configLoaded: meta.loaded,
     configError: meta.error || "",
     usedDefaults: meta.usedDefaults,
@@ -225,13 +257,13 @@ function validateConfig(config = {}, options = {}) {
   const errors = [];
   const warnings = [];
   const commands = [];
-  const configPath = options.configPath || CONFIG_PATH;
+  const configPath = options.configPath || defaultConfigPath(platform);
 
   if (options.configLoaded === false) {
     warnings.push(issue(
       "warn",
       "config_not_loaded",
-      `Could not read native/bridge.config.json; using built-in defaults. ${options.configError || ""}`.trim(),
+      `Could not read native config; using built-in defaults. ${options.configError || ""}`.trim(),
     ));
   }
 
@@ -301,6 +333,7 @@ function validateConfig(config = {}, options = {}) {
     ok: errors.length === 0,
     platform,
     configPath,
+    configCandidates: options.configCandidates || configPathCandidates({ platform }),
     configLoaded: options.configLoaded !== false,
     allowCwd: !!config.allowCwd,
     maxTimeoutMs: Number(config.maxTimeoutMs || 0),
@@ -345,7 +378,7 @@ function commandCandidates(config, command, platform = process.platform) {
 function resolveAllowedCommand(config, command, options = {}) {
   const candidates = commandCandidates(config, command, options.platform || process.platform);
   if (!candidates.length) {
-    throw new Error(`Command "${command}" is not in native/bridge.config.json allowlist.`);
+    throw new Error(`Command "${command}" is not in the native bridge config allowlist.`);
   }
   for (const candidate of candidates) {
     const resolved = resolveOnPath(candidate, options);
@@ -563,6 +596,9 @@ if (require.main === module) {
 
 module.exports = {
   defaultConfig,
+  configFolderForPlatform,
+  defaultConfigPath,
+  configPathCandidates,
   loadConfig,
   loadConfigWithMeta,
   startNativeHost,
